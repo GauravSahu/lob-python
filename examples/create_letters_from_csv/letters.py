@@ -50,6 +50,7 @@ success_csv_fields = [
     'address_state',
     'address_zip'
 ]
+
 errors_csv_fields = ['error']
 
 # create the output directory,
@@ -74,78 +75,83 @@ errors_filename = os.path.join(output_dir, 'errors.csv')
 with open('letter.html', 'r') as html_file:
     letter_html = html_file.read()
 
-with open(input_filename, 'r') as input, \
-     open(success_filename, 'w') as success, \
-     open(errors_filename, 'w') as errors:
+try:
+    with open(input_filename, 'r') as input, \
+         open(success_filename, 'w') as success, \
+         open(errors_filename, 'w') as errors:
 
-    # Print mode to screen
-    mode = lob.api_key.split('_')[0]
-    print('Sending letters in ' + mode.upper() + ' mode.')
+        # Print mode to screen
+        mode = lob.api_key.split('_')[0]
+        print('Sending letters in ' + mode.upper() + ' mode.')
 
-    input_csv = csv.DictReader(input)
-    errors_csv_fields += input_csv.fieldnames
+        input_csv = csv.DictReader(input)
+        errors_csv_fields += input_csv.fieldnames
 
-    success_csv = csv.DictWriter(success, fieldnames=success_csv_fields)
-    errors_csv = csv.DictWriter(errors, fieldnames=errors_csv_fields)
-    success_csv.writeheader()
-    errors_csv.writeheader()
+        success_csv = csv.DictWriter(success, fieldnames=success_csv_fields)
+        errors_csv = csv.DictWriter(errors, fieldnames=errors_csv_fields)
+        success_csv.writeheader()
+        errors_csv.writeheader()
 
-    err_count = 0
+        err_count = 0
 
-    # Loop through input CSV rows
-    for idx, row in enumerate(input_csv):
-        # Create letter from row
-        try:
-            letter = lob.Letter.create(
-                description='Bill for ' + row['name'],
-                metadata={
-                    'campaign': 'billing_statements',
-                    'csv':      input_filename
-                    },
-                to_address={
-                    'name': row['name'],
-                    'address_line1': row['address1'],
-                    'address_line2': row['address2'],
-                    'address_city':  row['city'],
-                    'address_zip':   row['postcode'],
-                    'address_state': row['state']
-                    },
-                from_address=from_address.id,
-                file=letter_html,
-                data={
-                    'date':   datetime.datetime.now().strftime("%m/%d/%Y"),
-                    'name':   row['name'],
-                    'amount': row['amount']
-                    },
-                color=True
-            )
-        except Exception, e:
-            error_row = {'error': e}
-            error_row.update(row)
-            errors_csv.writerow(error_row)
-            err_count += 1
-            sys.stdout.write('E')
-            sys.stdout.flush()
-        else:
-            success_csv.writerow({
-                'name':          letter.to_address.name,
-                'id':            letter.id,
-                'url':           letter.url,
-                'address_line1': letter.to_address.address_line1,
-                'address_line2': letter.to_address.address_line2,
-                'address_city':  letter.to_address.address_city,
-                'address_state': letter.to_address.address_state,
-                'address_zip':   letter.to_address.address_zip
-            })
+        # Loop through input CSV rows
+        for idx, row in enumerate(input_csv):
+            # Create letter from row
+            try:
+                letter = lob.Letter.create(
+                    description='Bill for ' + row['name'],
+                    metadata={
+                        'campaign': 'billing_statements',
+                        'csv':      input_filename
+                        },
+                    to_address={
+                        'name':          row['name'],
+                        'address_line1': row['address1'],
+                        'address_line2': row['address2'],
+                        'address_city':  row['city'],
+                        'address_zip':   row['postcode'],
+                        'address_state': row['state']
+                        },
+                    from_address=from_address.id,
+                    file=letter_html,
+                    data={
+                        'date':   datetime.datetime.now().strftime("%m/%d/%Y"),
+                        'name':   row['name'],
+                        'amount': row['amount']
+                        },
+                    color=True
+                )
+            except Exception, e:
+                error_row = {'error': e}
+                error_row.update(row)
+                errors_csv.writerow(error_row)
+                err_count += 1
+                sys.stdout.write('E')
+                sys.stdout.flush()
+            else:
+                success_csv.writerow({
+                    'name':          letter.to_address.name,
+                    'id':            letter.id,
+                    'url':           letter.url,
+                    'address_line1': letter.to_address.address_line1,
+                    'address_line2': letter.to_address.address_line2,
+                    'address_city':  letter.to_address.address_city,
+                    'address_state': letter.to_address.address_state,
+                    'address_zip':   letter.to_address.address_zip
+                })
 
-            # Print success
-            sys.stdout.write('.')
-            sys.stdout.flush()
+                # Print success
+                sys.stdout.write('.')
+                sys.stdout.flush()
 
-        # New lines for larger csv's
-        if idx % 10 is 9:
-            sys.stdout.write('\n')
-            sys.stdout.flush()
+            # New lines for larger csv's
+            if idx % 10 is 9:
+                sys.stdout.write('\n')
+                sys.stdout.flush()
+
+except Exception, e:
+    print('Error: ' + str(e))
+    sys.exit(1)
 
 print('')
 print('Done with ' + (str(err_count) if err_count else 'no') + ' errors.')
